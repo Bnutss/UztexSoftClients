@@ -45,5 +45,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+    <string>Хотите использовать дальнейший вход по Face ID?</string>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>tg</string>
+    </array>
 </dict>
 </plist>

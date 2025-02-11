@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'user_info_page.dart';
+import 'confidentiality_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -19,7 +20,15 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки приложения', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.orange, Colors.red],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(
           color: Colors.white,
         ),
@@ -53,7 +62,14 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.lock,
                     title: 'Конфиденциальность',
                     subtitle: 'Настройки конфиденциальности',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ConfidentialityPage(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -64,7 +80,7 @@ class _SettingsPageState extends State<SettingsPage> {
             bottom: 16,
             right: 16,
             child: Text(
-              'Версия 1.0.8',
+              'Версия 1.0.1',
               style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
           ),

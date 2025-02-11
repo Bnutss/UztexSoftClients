@@ -34,10 +34,18 @@ class MenuPage extends StatelessWidget {
           'Главное меню',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.orange, Colors.red],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: <Widget>[
           IconButton(
-            icon: const Icon(Icons.info, color: Colors.white),
+            icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () => _openSettings(context),
           ),
           IconButton(
@@ -50,7 +58,7 @@ class MenuPage extends StatelessWidget {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.deepPurple, Colors.purpleAccent],
+            colors: [Colors.orange, Colors.red],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -69,7 +77,7 @@ class MenuPage extends StatelessWidget {
                     style: TextStyle(color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Colors.blueGrey,
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30.0),
