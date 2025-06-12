@@ -89,7 +89,6 @@ class Order {
   }
 }
 
-// Repository
 class OrderRepository {
   static const String _apiUrl = 'https://uztexsoft.uz/api/orders/';
 
@@ -252,7 +251,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header with status and order number
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -318,8 +316,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                     ),
 
                     const SizedBox(height: 20),
-
-                    // Order details
                     Row(
                       children: [
                         Expanded(
@@ -341,8 +337,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                     ),
 
                     const SizedBox(height: 16),
-
-                    // Progress label
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -366,8 +360,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                   ],
                 ),
               ),
-
-              // Progress indicator
               Container(
                 height: 8,
                 decoration: const BoxDecoration(
@@ -381,7 +373,7 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                   children: [
                     Container(
                       width: MediaQuery.of(context).size.width *
-                          (order.scannedPercentage / 100) * 0.9, // Adjust for margins
+                          (order.scannedPercentage / 100) * 0.9,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: order.scannedPercentage >= 100
@@ -451,7 +443,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
     return Scaffold(
       body: Stack(
         children: [
-          // Градиентный фон
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -461,12 +452,9 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
               ),
             ),
           ),
-
-          // Основной контент
           SafeArea(
             child: Column(
               children: [
-                // Верхняя панель с заголовком и кнопками
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Row(
@@ -532,8 +520,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                     ],
                   ),
                 ),
-
-                // Поле поиска
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
                   child: Container(
@@ -568,8 +554,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
-
-                // Статус фильтра
                 if (_filterStatus != null || _searchModel.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -604,8 +588,6 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                       ],
                     ),
                   ),
-
-                // Содержимое списка
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.only(top: 16),
