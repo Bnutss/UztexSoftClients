@@ -2,86 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:ui';
 
 class ConfidentialityPage extends StatefulWidget {
   @override
   _ConfidentialityPageState createState() => _ConfidentialityPageState();
 }
 
-class _ConfidentialityPageState extends State<ConfidentialityPage> with SingleTickerProviderStateMixin {
+class _ConfidentialityPageState extends State<ConfidentialityPage> {
   final LocalAuthentication auth = LocalAuthentication();
   bool _canCheckBiometrics = false;
   bool _isAuthenticated = false;
   bool _useBiometrics = false;
-  bool _isLoading = false;
   List<BiometricType> _availableBiometrics = [];
-  late AnimationController _animationController;
-  late Animation<double> _fadeInAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeInAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-    _animationController.forward();
     _checkBiometrics();
     _loadBiometricPreference();
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
   Future<void> _checkBiometrics() async {
-    bool canCheckBiometrics;
-    List<BiometricType> availableBiometrics;
-
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      canCheckBiometrics = await auth.canCheckBiometrics;
-      availableBiometrics = await auth.getAvailableBiometrics();
+      final canCheck = await auth.canCheckBiometrics;
+      final available = await auth.getAvailableBiometrics();
+      if (mounted) {
+        setState(() {
+          _canCheckBiometrics = canCheck;
+          _availableBiometrics = available;
+        });
+      }
     } catch (e) {
-      canCheckBiometrics = false;
-      availableBiometrics = <BiometricType>[];
+      if (mounted) {
+        setState(() {
+          _canCheckBiometrics = false;
+          _availableBiometrics = [];
+        });
+      }
     }
-
-    if (!mounted) return;
-
-    setState(() {
-      _canCheckBiometrics = canCheckBiometrics;
-      _availableBiometrics = availableBiometrics;
-      _isLoading = false;
-    });
   }
 
   Future<void> _loadBiometricPreference() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool? useBiometrics = prefs.getBool('useBiometrics');
-
-    if (!mounted) return;
-
-    setState(() {
-      _useBiometrics = useBiometrics ?? false;
-    });
+    if (mounted) {
+      setState(() {
+        _useBiometrics = prefs.getBool('useBiometrics') ?? false;
+      });
+    }
   }
 
   Future<void> _authenticate() async {
-    setState(() {
-      _isLoading = true;
-    });
-
     bool authenticated = false;
     try {
       authenticated = await auth.authenticate(
@@ -93,64 +63,36 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> with SingleTi
         ),
       );
     } catch (e) {
-      authenticated = false;
-      _showErrorMessage('Ошибка аутентификации: $e');
+      _showMessage('Ошибка аутентификации', isError: true);
     }
 
-    if (!mounted) return;
-
-    setState(() {
-      _isAuthenticated = authenticated;
-      _isLoading = false;
-    });
-
-    if (authenticated) {
-      _showSuccessMessage('Аутентификация успешна');
+    if (mounted) {
+      setState(() => _isAuthenticated = authenticated);
+      if (authenticated) {
+        _showMessage('Доступ получен', isError: false);
+      }
     }
   }
 
-  Future<void> _toggleBiometricPreference(bool value) async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _toggleBiometric(bool value) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('useBiometrics', value);
-
-    if (!mounted) return;
-
-    setState(() {
-      _useBiometrics = value;
-      _isLoading = false;
-    });
-
-    _showSuccessMessage(value
-        ? 'Биометрическая аутентификация включена'
-        : 'Биометрическая аутентификация отключена');
+    if (mounted) {
+      setState(() => _useBiometrics = value);
+      _showMessage(
+        value ? 'Биометрия включена' : 'Биометрия отключена',
+        isError: false,
+      );
+    }
   }
 
-  void _showSuccessMessage(String message) {
+  void _showMessage(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: isError ? const Color(0xFFE53935) : const Color(0xFF43A047),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-    );
-  }
-
-  void _showErrorMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -158,419 +100,223 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> with SingleTi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Column(
         children: [
-          // Градиентный фон
           Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFFFF9800), Color(0xFFE53935)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFA726), Color(0xFFE53935)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
-          ),
-
-          // Декоративные элементы
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-
-          // Основное содержимое
-          SafeArea(
-            child: Column(
-              children: [
-                // Верхняя панель с заголовком и кнопкой возврата
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Row(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Text(
                         'Конфиденциальность',
                         style: GoogleFonts.poppins(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                // Содержимое
-                Expanded(
-                  child: FadeTransition(
-                    opacity: _fadeInAnimation,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 24.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(32),
-                          topRight: Radius.circular(32),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            spreadRadius: 0,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        child: _isAuthenticated
-                            ? _buildAuthenticatedContent()
-                            : _buildUnauthenticatedContent(),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.1),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
+                      ],
+                    ),
+                    child: Center(
+                      child: Icon(
+                        _isAuthenticated ? Icons.shield_rounded : Icons.lock_outline_rounded,
+                        color: const Color(0xFFE53935),
+                        size: 32,
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Индикатор загрузки
-          if (_isLoading)
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: Container(
-                color: Colors.black45,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  const SizedBox(height: 12),
+                  Text(
+                    _isAuthenticated ? 'Настройки защищены' : 'Доступ ограничен',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _isAuthenticated
+                        ? 'Управляйте параметрами безопасности'
+                        : 'Пройдите аутентификацию для доступа',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.85),
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+          Expanded(
+            child: _isAuthenticated
+                ? _buildAuthenticatedContent()
+                : _buildUnauthenticatedContent(),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildAuthenticatedContent() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE53935).withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE53935).withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.security,
-                      size: 60,
-                      color: Color(0xFFE53935),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: Text(
-              'Настройки защищены',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Center(
-            child: Text(
-              'Настройте параметры конфиденциальности для вашего аккаунта',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 40),
-
-          // Секция биометрии
-          _buildSectionTitle('Биометрическая аутентификация'),
-          const SizedBox(height: 8),
-
-          if (!_canCheckBiometrics) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.orange.withOpacity(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.orange[700],
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Биометрическая аутентификация недоступна на этом устройстве',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.orange[800],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            _buildSwitchItem(
-              icon: Icons.fingerprint,
-              title: 'Биометрическая аутентификация',
-              subtitle: 'Использовать отпечаток пальца или Face ID для входа в приложение',
-              value: _useBiometrics,
-              onChanged: _toggleBiometricPreference,
-            ),
-          ],
-
-          const SizedBox(height: 24),
-
-          // Информация о доступных биометрических данных
-          if (_availableBiometrics.isNotEmpty) ...[
-            _buildSectionTitle('Доступные биометрические методы'),
-            const SizedBox(height: 8),
-            ...List.generate(_availableBiometrics.length, (index) {
-              IconData icon;
-              String title;
-
-              switch (_availableBiometrics[index]) {
-                case BiometricType.face:
-                  icon = Icons.face;
-                  title = 'Распознавание лица';
-                  break;
-                case BiometricType.fingerprint:
-                  icon = Icons.fingerprint;
-                  title = 'Отпечаток пальца';
-                  break;
-                case BiometricType.strong:
-                  icon = Icons.security;
-                  title = 'Сильная биометрия';
-                  break;
-                case BiometricType.weak:
-                  icon = Icons.phonelink_lock;
-                  title = 'Базовая биометрия';
-                  break;
-                default:
-                  icon = Icons.verified_user;
-                  title = 'Другой метод';
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE53935).withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        color: const Color(0xFFE53935),
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const Spacer(),
-                    const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
-                      size: 20,
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUnauthenticatedContent() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return ListView(
+      padding: const EdgeInsets.all(20),
       children: [
-        // Иконка замка
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE53935).withOpacity(0.1),
-            shape: BoxShape.circle,
+        _buildSection('Биометрия'),
+        if (!_canCheckBiometrics)
+          _buildInfoCard(
+            icon: Icons.info_outline_rounded,
+            title: 'Биометрия недоступна',
+            subtitle: 'Устройство не поддерживает биометрическую аутентификацию',
+            color: Colors.orange,
+          )
+        else
+          _buildSwitchCard(
+            icon: Icons.fingerprint_rounded,
+            title: 'Биометрическая защита',
+            subtitle: 'Вход по отпечатку пальца или Face ID',
+            value: _useBiometrics,
+            onChanged: _toggleBiometric,
           ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE53935).withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.lock_outline,
-              size: 60,
-              color: Color(0xFFE53935),
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        Text(
-          'Доступ ограничен',
-          style: GoogleFonts.poppins(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            'Для доступа к настройкам конфиденциальности необходимо пройти биометрическую аутентификацию',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 40),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: ElevatedButton.icon(
-            onPressed: _authenticate,
-            icon: const Icon(Icons.fingerprint),
-            label: Text(
-              'АУТЕНТИФИКАЦИЯ',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE53935),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              elevation: 5,
-              shadowColor: const Color(0xFFE53935).withOpacity(0.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
+        if (_availableBiometrics.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildSection('Доступные методы'),
+          ..._availableBiometrics.map((type) => _buildBiometricItem(type)),
+        ],
       ],
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
+  Widget _buildUnauthenticatedContent() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE53935).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.fingerprint_rounded,
+                color: Color(0xFFE53935),
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Аутентификация',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Подтвердите свою личность для доступа к настройкам конфиденциальности',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[500],
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            GestureDetector(
+              onTap: _authenticate,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFA726), Color(0xFFE53935)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE53935).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    'Войти',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSwitchItem({
+  Widget _buildSection(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[500],
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchCard({
     required IconData icon,
     required String title,
     required String subtitle,
@@ -578,27 +324,30 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> with SingleTi
     required ValueChanged<bool> onChanged,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFE53935).withOpacity(0.1),
-              shape: BoxShape.circle,
+              color: const Color(0xFFE53935).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFFE53935),
-              size: 24,
-            ),
+            child: Icon(icon, color: const Color(0xFFE53935), size: 22),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,16 +355,17 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> with SingleTi
                 Text(
                   title,
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF1E293B),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+                    fontSize: 12,
+                    color: Colors.grey[500],
                   ),
                 ),
               ],
@@ -627,6 +377,125 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> with SingleTi
             activeColor: const Color(0xFFE53935),
             activeTrackColor: const Color(0xFFE53935).withOpacity(0.3),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBiometricItem(BiometricType type) {
+    IconData icon;
+    String title;
+
+    switch (type) {
+      case BiometricType.face:
+        icon = Icons.face_rounded;
+        title = 'Face ID';
+        break;
+      case BiometricType.fingerprint:
+        icon = Icons.fingerprint_rounded;
+        title = 'Отпечаток пальца';
+        break;
+      case BiometricType.strong:
+        icon = Icons.shield_rounded;
+        title = 'Сильная биометрия';
+        break;
+      case BiometricType.weak:
+        icon = Icons.phonelink_lock_rounded;
+        title = 'Базовая биометрия';
+        break;
+      default:
+        icon = Icons.verified_user_rounded;
+        title = 'Другой метод';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF43A047).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: const Color(0xFF43A047), size: 22),
+          ),
+          const SizedBox(width: 14),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF1E293B),
+            ),
+          ),
+          const Spacer(),
+          Icon(Icons.check_circle_rounded, color: const Color(0xFF43A047), size: 20),
         ],
       ),
     );

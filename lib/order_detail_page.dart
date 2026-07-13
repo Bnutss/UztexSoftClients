@@ -15,7 +15,7 @@ class OrderDetailPage extends StatefulWidget {
   _OrderDetailPageState createState() => _OrderDetailPageState();
 }
 
-class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProviderStateMixin {
+class _OrderDetailPageState extends State<OrderDetailPage> {
   Order? order;
   bool isLoading = true;
   String? errorMessage;
@@ -23,27 +23,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
   String? telegramId;
   String searchQuery = '';
   bool isSendingFile = false;
-  late AnimationController _animationController;
-  late Animation<double> _fadeInAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeInAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
     _loadTokenAndTelegramId();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
   }
 
   double get totalProgress {
@@ -58,7 +42,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
   }
 
   String get progressPercentage {
-    return '${(totalProgress * 100).toStringAsFixed(1)}%';
+    return '${(totalProgress * 100).toStringAsFixed(0)}%';
   }
 
   Future<void> _loadTokenAndTelegramId() async {
@@ -95,11 +79,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
           order = Order.fromJson(data);
           isLoading = false;
         });
-        _animationController.reset();
-        _animationController.forward();
       } else {
         setState(() {
-          errorMessage = 'Ошибка при загрузке деталей заказа: ${response.statusCode}';
+          errorMessage = 'Ошибка загрузки: ${response.statusCode}';
           isLoading = false;
         });
       }
@@ -113,130 +95,100 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
 
   Future<void> sendFile() async {
     if (telegramId == null || telegramId!.isEmpty) {
-      _showErrorMessage('Пожалуйста, установите свой Telegram ID в профиле.');
+      _showMessage('Установите Telegram ID в профиле', isError: true);
       return;
     }
 
-    setState(() {
-      isSendingFile = true;
-    });
+    setState(() => isSendingFile = true);
 
-    final url = 'https://uztexsoft.uz/api/orders/${widget.orderId}/details/excel/';
     try {
-      if (token == null || token!.isEmpty) {
-        throw Exception('Токен не найден');
-      }
+      if (token == null || token!.isEmpty) throw Exception('Токен не найден');
 
       final response = await http.get(
-        Uri.parse(url),
+        Uri.parse('https://uztexsoft.uz/api/orders/${widget.orderId}/details/excel/'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Authorization': 'Bearer $token',
         },
       );
 
-      setState(() {
-        isSendingFile = false;
-      });
+      setState(() => isSendingFile = false);
 
       if (response.statusCode == 200) {
-        _showSuccessMessage('Excel файл успешно отправлен через Telegram');
+        _showMessage('Excel отправлен в Telegram', isError: false);
       } else {
-        _showErrorMessage('Ошибка отправки Excel файла: ${response.statusCode}');
+        _showMessage('Ошибка отправки: ${response.statusCode}', isError: true);
       }
     } catch (e) {
-      setState(() {
-        isSendingFile = false;
-      });
-      _showErrorMessage('Ошибка: $e');
+      setState(() => isSendingFile = false);
+      _showMessage('Ошибка: $e', isError: true);
     }
   }
 
-  void _showSuccessMessage(String message) {
+  void _showMessage(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: isError ? const Color(0xFFE53935) : const Color(0xFF43A047),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-    );
-  }
-
-  void _showErrorMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
   List<Position> get filteredPositions {
-    if (searchQuery.isEmpty) {
-      return order?.positions ?? [];
-    }
+    if (searchQuery.isEmpty) return order?.positions ?? [];
     return order?.positions
-        .where((position) =>
-    position.part_number.toLowerCase().contains(searchQuery.toLowerCase()) ||
-        position.size.toLowerCase().contains(searchQuery.toLowerCase()) ||
-        position.color.toLowerCase().contains(searchQuery.toLowerCase()))
+        .where((p) =>
+            p.part_number.toLowerCase().contains(searchQuery.toLowerCase()) ||
+            p.size.toLowerCase().contains(searchQuery.toLowerCase()) ||
+            p.color.toLowerCase().contains(searchQuery.toLowerCase()))
         .toList() ??
         [];
   }
 
   Color _getStatusColor(double percentage) {
-    if (percentage >= 1.0) return Colors.green;
-    if (percentage >= 0.75) return Colors.green.shade700;
-    if (percentage >= 0.5) return const Color(0xFFFF9800);
-    if (percentage >= 0.25) return Colors.orange.shade700;
+    if (percentage >= 1.0) return const Color(0xFF43A047);
+    if (percentage >= 0.5) return const Color(0xFFFFA726);
     return const Color(0xFFE53935);
   }
 
   @override
   Widget build(BuildContext context) {
     final numberFormat = NumberFormat('#,##0', 'ru_RU');
+    final statusColor = _getStatusColor(totalProgress);
 
     return Scaffold(
-      body: Stack(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Column(
         children: [
-          // Градиентный фон
           Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFFFF9800), Color(0xFFE53935)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFA726), Color(0xFFE53935)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
-          ),
-
-          // Основной контент
-          SafeArea(
-            child: Column(
-              children: [
-                // Верхняя панель с заголовком и кнопками
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Row(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,171 +196,135 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
                             Text(
                               'Заказ №${widget.orderId}',
                               style: GoogleFonts.poppins(
-                                fontSize: 20,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(totalProgress).withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    'Прогресс: $progressPercentage',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              '$progressPercentage выполнено',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.85),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: isSendingFile
+                      GestureDetector(
+                        onTap: isSendingFile ? null : sendFile,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: isSendingFile
                               ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                              : const Icon(Icons.send, color: Colors.white),
-                          onPressed: isSendingFile ? null : sendFile,
-                          tooltip: 'Отправить Excel файл',
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                // Индикатор прогресса
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Stack(
+                  const SizedBox(height: 20),
+                  Row(
                     children: [
-                      Container(
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      Container(
-                        height: 10,
-                        width: MediaQuery.of(context).size.width * 0.9 * totalProgress,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: totalProgress >= 1.0
-                                ? [Colors.green.shade400, Colors.green.shade700]
-                                : [Colors.orange, Colors.red],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Прогресс',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
+                                ),
+                                Text(
+                                  progressPercentage,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: totalProgress,
+                                backgroundColor: Colors.white.withOpacity(0.3),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                minHeight: 8,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                // Поле поиска
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          spreadRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Поиск по артикулу, размеру или цвету',
-                        hintStyle: GoogleFonts.poppins(
-                          color: Colors.grey[400],
-                        ),
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFFE53935)),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          searchQuery = value;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-
-                // Количество позиций
-                if (!isLoading && order != null)
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Всего позиций: ${order!.positions.length}',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          'Найдено: ${filteredPositions.length}',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Содержимое позиций
-                Expanded(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(32),
-                        topRight: Radius.circular(32),
-                      ),
-                    ),
-                    child: RefreshIndicator(
-                      onRefresh: fetchOrderDetail,
-                      child: _buildContent(numberFormat),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
+          ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TextField(
+                style: GoogleFonts.poppins(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Поиск по артикулу, размеру, цвету',
+                  hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400]),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                onChanged: (value) => setState(() => searchQuery = value),
+              ),
+            ),
+          ),
+          if (!isLoading && order != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text(
+                    '${filteredPositions.length} позиций',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _buildContent(numberFormat),
           ),
         ],
       ),
@@ -419,7 +335,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
     if (isLoading) {
       return ListView.builder(
         itemCount: 5,
-        padding: const EdgeInsets.only(top: 24, left: 16, right: 16, bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         itemBuilder: (context, index) => _buildShimmerCard(),
       );
     }
@@ -427,87 +343,53 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
     if (errorMessage != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(24),
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: const Color(0xFFE53935).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 64,
-                ),
+                child: const Icon(Icons.error_outline_rounded, color: Color(0xFFE53935), size: 40),
               ),
               const SizedBox(height: 24),
               Text(
                 'Ошибка загрузки',
                 style: GoogleFonts.poppins(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color: const Color(0xFF1E293B),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 errorMessage!,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
                 textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: fetchOrderDetail,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Повторить'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE53935),
-                  foregroundColor: Colors.white,
+              GestureDetector(
+                onTap: fetchOrderDetail,
+                child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFA726), Color(0xFFE53935)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Повторить',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    if (order == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search_off_outlined,
-                color: Colors.grey[400],
-                size: 64,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Нет данных о заказе',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
-              ),
-            ),
-          ],
         ),
       );
     }
@@ -518,86 +400,60 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 color: Colors.grey.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.search_off_outlined,
-                color: Colors.grey[400],
-                size: 64,
-              ),
+              child: Icon(Icons.inventory_2_outlined, color: Colors.grey[400], size: 40),
             ),
             const SizedBox(height: 24),
             Text(
-              'Ничего не найдено',
+              'Пусто',
               style: GoogleFonts.poppins(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: const Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-              child: Text(
-                'Попробуйте изменить параметры поиска',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
+            Text(
+              'Позиции не найдены',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
             ),
           ],
         ),
       );
     }
 
-    return FadeTransition(
-      opacity: _fadeInAnimation,
+    return RefreshIndicator(
+      onRefresh: fetchOrderDetail,
       child: ListView.builder(
         itemCount: filteredPositions.length,
-        padding: const EdgeInsets.only(top: 24, left: 16, right: 16, bottom: 16),
-        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         itemBuilder: (context, index) {
           final position = filteredPositions[index];
           final progress = position.count > 0 ? position.scanned / position.count : 0.0;
           final isComplete = position.scanned == position.count;
-
           return _buildPositionCard(position, progress, isComplete, numberFormat);
         },
       ),
     );
   }
 
-  Widget _buildShimmerCard() {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        height: 180,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPositionCard(Position position, double progress, bool isComplete, NumberFormat numberFormat) {
+    final statusColor = _getStatusColor(progress);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
-            spreadRadius: 0,
             offset: const Offset(0, 2),
           ),
         ],
@@ -605,26 +461,22 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header with status and size
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: isComplete
-                            ? Colors.green.withOpacity(0.1)
-                            : const Color(0xFFFF9800).withOpacity(0.1),
+                        color: statusColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        isComplete ? Icons.check_circle_outline : Icons.pending_outlined,
-                        color: isComplete ? Colors.green : const Color(0xFFFF9800),
-                        size: 24,
+                        isComplete ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                        color: statusColor,
+                        size: 22,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -633,88 +485,72 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Размер: ${position.size}',
+                            position.size,
                             style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.black87,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: const Color(0xFF1E293B),
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
-                            'Артикул: ${position.part_number}',
+                            position.part_number,
                             style: GoogleFonts.poppins(
-                              color: Colors.grey[600],
-                              fontSize: 14,
+                              fontSize: 12,
+                              color: Colors.grey[500],
                             ),
                           ),
                         ],
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(progress).withOpacity(0.1),
+                        color: statusColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        '${(progress * 100).toStringAsFixed(1)}%',
+                        '${(progress * 100).toStringAsFixed(0)}%',
                         style: GoogleFonts.poppins(
-                          color: _getStatusColor(progress),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
                         ),
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 16),
-
-                // Details
                 Row(
                   children: [
-                    Expanded(
-                      child: _buildInfoItem(
-                        icon: Icons.color_lens_outlined,
-                        label: 'Цвет',
-                        value: position.color,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildInfoItem(
-                        icon: Icons.format_list_numbered_outlined,
-                        label: 'Количество',
-                        value: '${numberFormat.format(position.count)} шт',
+                    Flexible(child: _buildInfoTag(Icons.palette_rounded, position.color)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: _buildInfoTag(
+                        Icons.inventory_rounded,
+                        '${numberFormat.format(position.count)} шт',
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 16),
-
-                // Scanning progress
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                      child: _buildScanningItem(
-                        icon: Icons.check_circle_outline,
-                        label: 'Сканировано',
-                        value: '${numberFormat.format(position.scanned)} шт',
-                        color: Colors.green,
+                      child: _buildStatItem(
+                        Icons.check_circle_rounded,
+                        'Сканировано',
+                        '${numberFormat.format(position.scanned)}',
+                        const Color(0xFF43A047),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildScanningItem(
-                        icon: Icons.remove_circle_outline,
-                        label: 'Осталось',
-                        value: '${numberFormat.format(position.count - position.scanned)} шт',
-                        color: Colors.red,
+                      child: _buildStatItem(
+                        Icons.cancel_rounded,
+                        'Осталось',
+                        '${numberFormat.format(position.count - position.scanned)}',
+                        const Color(0xFFE53935),
                       ),
                     ),
                   ],
@@ -722,36 +558,16 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
               ],
             ),
           ),
-
-          // Progress indicator
-          Container(
-            height: 8,
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-              color: Color(0xFFEEEEEE),
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(16),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: MediaQuery.of(context).size.width * progress * 0.9, // Adjust for margins
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: progress >= 1.0
-                          ? [Colors.green.shade400, Colors.green.shade700]
-                          : [const Color(0xFFFF9800), const Color(0xFFE53935)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                    ),
-                  ),
-                ),
-              ],
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: const Color(0xFFF1F5F9),
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              minHeight: 6,
             ),
           ),
         ],
@@ -759,81 +575,79 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
     );
   }
 
-  Widget _buildInfoItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: const Color(0xFFE53935),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
+  Widget _buildInfoTag(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[500]),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                color: Colors.grey[600],
                 fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF1E293B),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            color: Colors.black87,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[500]),
+              ),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildScanningItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: color,
+  Widget _buildShimmerCard() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[200]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        height: 160,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
         ),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-            ),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }
